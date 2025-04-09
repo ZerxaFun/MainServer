@@ -1,0 +1,5 @@
+<?php
+
+return [
+    'errorModule' => 'Frontend'
+];

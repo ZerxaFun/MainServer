@@ -1,0 +1,42 @@
+{
+  "name": "zerxa/majestic",
+  "description": "Majestic a PHP framework for personal web-site, REST API service, CLI application and other project",
+  "autoload": {
+    "psr-4": {
+      "Core\\": "Core/",
+      "Modules\\": "Modules/"
+    },
+    "files": [
+      "Core/Function/devdump.php"
+    ]
+  },
+  "authors": [
+    {
+      "name": "ZerxaFun aKa Zerxa",
+      "email": "ZerxaFun@gmail.com"
+    }
+  ],
+  "require": {
+    "illuminate/database": "^9.52",
+    "illuminate/events": "^9.17",
+    "ext-gd": "*",
+    "ext-curl": "*",
+    "firebase/php-jwt": "^6.9",
+    "longman/telegram-bot": "^0.82.0",
+    "minishlink/web-push": "^8.0",
+    "maatwebsite/excel": "^3.1",
+    "ramsey/uuid": "^4.7",
+    "ext-zip": "*",
+    "ext-pdo": "*",
+    "ext-simplexml": "*",
+    "stichoza/google-translate-php": "^5.2"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest"
+  },
+  "config": {
+    "allow-plugins": {
+      "php-http/discovery": false
+    }
+  }
+}
