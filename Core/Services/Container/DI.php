@@ -49,8 +49,17 @@ class DI
             throw new RuntimeException("DI: dependency '$key' not found.");
         }
 
-        return $this->container[$key];
+        $value = $this->container[$key];
+
+        // 👉 Если это замыкание — вызываем и заменяем в контейнере
+        if ($value instanceof \Closure) {
+            $value = $value(); // вызываем
+            $this->container[$key] = $value; // кэшируем результат
+        }
+
+        return $value;
     }
+
 
     /**
      * Устанавливает значение в контейнер по ключу или в секцию

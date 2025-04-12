@@ -35,7 +35,7 @@ abstract class AbstractHeader
      *
      * @var array - тип HTTP запроса к роутеру
      */
-    protected array $type = [
+    protected static array $type = [
         'html' => 'text/html',
         'json' => 'application/json',
         'xml' => 'application/xml',
@@ -45,7 +45,7 @@ abstract class AbstractHeader
     /**
      * @var string - кодировка страниц
      */
-    protected string $charset = 'utf-8';
+    protected static string $charset = 'utf-8';
 
 
 }

@@ -6,20 +6,28 @@ use Core\Services\Validation\Contracts\RuleInterface;
 
 class MinRule implements RuleInterface
 {
-    private float|int $min;
+    protected int $min;
 
-    public function __construct(float|int $min)
+    public function __construct(int $min)
     {
         $this->min = $min;
     }
 
     public function validate(string $field, mixed $value, array $data): bool
     {
-        return isset($data[$field]) && $value >= $this->min;
+        if (is_string($value)) {
+            return mb_strlen($value) >= $this->min;
+        }
+
+        if (is_numeric($value)) {
+            return $value >= $this->min;
+        }
+
+        return false;
     }
 
     public function message(string $field): string
     {
-        return "Поле {$field} должно быть не меньше {$this->min}.";
+        return "Поле {$field} должно быть не короче {$this->min} символов.";
     }
 }

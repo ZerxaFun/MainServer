@@ -2,110 +2,124 @@
 
 namespace Core\Services\Modules;
 
-use Core\Services\Container\DI;
+use Core\Routing\Router;
+use Core\Services\Config\Config;
 use Core\Services\Http\Redirect;
 use Core\Services\Http\Uri;
-use Core\Services\Routing\Module;
-use Core\Services\Routing\Route;
-use Core\Services\Routing\Router;
 use Core\Services\Session\Facades\Session;
-use RuntimeException;
 
 class Language
 {
-    public static ?string $clientLanguage = null;
-
-    /**
-     * Инициализация параметров языка модуля
-     * @return void
-     * @throws RuntimeException
-     * @throws \JsonException
-     */
     public static function init(): void
     {
-        if (!Router::module()->module) {
-            throw new RuntimeException('Ошибка. Модуль отсутствует.');
-        }
+        // пусто — всё по URI или сессии
+    }
 
-        if (Session::get('language') === false) {
-            Session::put('language', []);
-        }
+    public static function current(): string
+    {
+        $module = Router::module()->module;
+        $langs = LanguageConfig::$modules[$module]['languages'] ?? [];
 
-        if (array_key_exists(Router::module()->module, LanguageConfig::$modules)) {
-            $moduleLanguage = LanguageConfig::$modules[Router::module()->module];
-            $uriLanguage = Uri::segmentLanguage();
+        $prefix = Uri::segmentOriginal(1);
 
-            if ($moduleLanguage['manifest']->multiLanguage === true) {
-                /**
-                 * Если в сессии пользователя уже существует конфигурация языка
-                 */
-                if (array_key_exists(Router::module()->module, Session::get('language'))) {
-                    if (array_key_exists($uriLanguage, $moduleLanguage['languages'])) {
-                        /**
-                         * Меняем префикс и ISO языка местами, чтобы проверить валиден ли наш текущий префикс языка
-                         * В случаи отсутствия языка в модуле не меняем его язык, оставляем тот, что есть в сессии.
-                         */
-                        $prefix = [];
-                        foreach (LanguageConfig::$modules[Router::module()->module]['languages'] as $lang) {
-                            $prefix[$lang['prefix']] = $lang['iso'];
-                        }
-
-                        if (array_key_exists(Uri::segmentOriginal(1), $prefix)) {
-                            $_SESSION['Majestic']['language'][Router::module()->module] = $moduleLanguage['languages'][$uriLanguage];
-                        }
-                    }
-                } else {
-                    /**
-                     * Если у пользователя в сессии язык не установлен получаем язык по умолчанию, либо язык его региона
-                     */
-                    /**
-                     * Выбранный язык
-                     */
-                    $defaultModuleLanguage = LanguageConfig::getDefaultLanguageModule(Router::module()->module);
-
-                    /**
-                     * Если сессия языка ещё не установлена
-                     */
-                    if (array_key_exists(Router::module()->module, Session::get('language')) === false) {
-                        /**
-                         * Если нет URL профикса языка и пользователь на главной странице
-                         * устанавливаем ему язык модуля по умолчанию.
-                         */
-                        if ($uriLanguage === $defaultModuleLanguage) {
-                            /**
-                             * Записываем данные языка в сессию
-                             */
-                            $_SESSION['Majestic']['language'][Router::module()->module] = $moduleLanguage['languages'][$defaultModuleLanguage];
-                        } else {
-                            $_SESSION['Majestic']['language'][Router::module()->module] = $moduleLanguage['languages'][$uriLanguage];
-                        }
-                    } else if (Uri::segmentOriginal(1) !== null) {
-                        /**
-                         * Если сессия уже установлена, то проверям, есть ли первый сегмент URI.
-                         */
-                        $_SESSION['Majestic']['language'][Router::module()->module] = $moduleLanguage['languages'][$uriLanguage];
-                    }
+        // 1. Префикс есть в URL → значит пользователь явно выбрал язык
+        if ($prefix) {
+            foreach ($langs as $iso => $lang) {
+                if ($lang['prefix'] === $prefix) {
+                    return $iso;
                 }
             }
+        }
 
-            LanguageConfig::reloadConfig();
-            DI::instance()->set('language', LanguageConfig::$modules[Router::module()->module]);
+        // 2. Есть язык в сессии
+        if (Session::has('lang') && isset($langs[Session::get('lang')])) {
+            return Session::get('lang');
+        }
+
+        // 3. Возвращаем язык по умолчанию
+        return LanguageConfig::getDefaultLanguageModule($module);
+    }
+
+    public static function currentPrefix(): string
+    {
+        $module = Router::module()->module;
+        $langs = LanguageConfig::$modules[$module]['languages'] ?? [];
+
+        $current = self::current();
+
+        return $langs[$current]['prefix'] ?? '';
+    }
+
+    public static function redirect(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') return;
+
+        $module = Router::module()->module;
+        $langs = LanguageConfig::$modules[$module]['languages'] ?? [];
+
+        $prefix = Uri::segmentOriginal(1);
+
+        // 1. Если префикс есть → пользователь явно выбрал язык
+        if ($prefix) {
+            foreach ($langs as $iso => $lang) {
+                if ($lang['prefix'] === $prefix) {
+                    Session::put('lang', $iso);
+                    return;
+                }
+            }
+        }
+
+        // 2. Если нет префикса, но есть сохранённый язык в сессии
+        if (!$prefix && Session::has('lang')) {
+            $iso = Session::get('lang');
+
+            if (isset($langs[$iso]) && !$langs[$iso]['default']) {
+                Redirect::go('/' . $langs[$iso]['prefix'] . '/');
+            }
+
+            return;
+        }
+
+        // 3. Нет префикса и нет сессии — проверим включено ли автоопределение
+        if (!$prefix && Config::item('useBrowserLang', 'main') === true) {
+            $preferred = self::detectFromHeader();
+            $default = LanguageConfig::getDefaultLanguageModule($module);
+
+            if ($preferred && $preferred !== $default && isset($langs[$preferred])) {
+                Redirect::go('/' . $langs[$preferred]['prefix'] . '/');
+            }
+
+            return;
+        }
+
+        // 4. Всё отключено — редиректим на default язык, если он не без префикса
+        $default = LanguageConfig::getDefaultLanguageModule($module);
+
+        if (!$prefix && isset($langs[$default]) && !$langs[$default]['default']) {
+            Redirect::go('/' . $langs[$default]['prefix'] . '/');
         }
     }
 
-    public static function redirect()
-    {
-        if ($_SERVER['REQUEST_METHOD'] === 'GET' &&
-            array_key_exists(Router::module()->module, $_SESSION['Majestic']['language']) &&
-            Uri::segmentLanguage() !== $_SESSION['Majestic']['language'][Router::module()->module]['iso'] &&
-            $_SESSION['Majestic']['language'][Router::module()->module]['default'] !== true) {
 
-            Redirect::go('/' . $_SESSION['Majestic']['language'][Router::module()->module]['prefix'] . '/' . Uri::segmentString());
+    public static function detectFromHeader(): ?string
+    {
+        if (!isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+            return null;
         }
-    }
 
-    public static function getUrl()
-    {
-        return '/' . $_SESSION['Majestic']['language'][Router::module()->module]['prefix'] . '/' . Uri::segmentString();
+        $header = $_SERVER['HTTP_ACCEPT_LANGUAGE'];
+        $parts = explode(',', $header);
+
+        $module = Router::module()->module;
+        $supported = array_keys(LanguageConfig::$modules[$module]['languages'] ?? []);
+
+        foreach ($parts as $part) {
+            $code = substr(trim($part), 0, 2);
+            if (in_array($code, $supported, true)) {
+                return $code;
+            }
+        }
+
+        return null;
     }
 }

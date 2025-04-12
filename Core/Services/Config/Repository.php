@@ -63,7 +63,7 @@ final class Repository
      */
     public static function retrieve(string $group, string $key): mixed
     {
-        return self::$stored[$group][$key] ?? [];
+        return self::$stored[$group][$key] ?? false;
     }
 
     /**

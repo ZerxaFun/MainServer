@@ -1,0 +1,10 @@
+{
+  "type": "theme",
+  "name": "default",
+  "module": "frontend",
+  "assets": "assets",
+  "authors": {
+    "name": "ZerxaFun aKa Zerxa",
+    "email": "ZerxaFun@gmail.com"
+  }
+}

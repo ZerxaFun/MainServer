@@ -20,10 +20,14 @@ set_time_limit(-1);
  */
 
 
-use Core\Bootstrap;
-use Core\Services\ErrorHandler\ErrorHandler;
+
+use Core\Bootstrap\Bootstrap;
+
 
 require '../vendor/autoload.php';
+
+
+
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -41,9 +45,6 @@ try {
 
 
     Bootstrap::run(dirname(__DIR__));
-
-
-
 } catch (Exception $exception) {
-    ErrorHandler::exception($exception);
+    dd($exception);
 }

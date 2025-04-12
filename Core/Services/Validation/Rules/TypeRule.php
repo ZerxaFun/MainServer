@@ -6,25 +6,25 @@ use Core\Services\Validation\Contracts\RuleInterface;
 
 class TypeRule implements RuleInterface
 {
-    private string $type;
+    protected string $type;
 
     public function __construct(string $type)
     {
-        $this->type = $type;
+        $this->type = strtolower($type);
     }
 
     public function validate(string $field, mixed $value, array $data): bool
     {
-        if (!isset($data[$field])) return true;
-
         return match ($this->type) {
-            'email' => is_string($value) && filter_var($value, FILTER_VALIDATE_EMAIL),
-            'string' => is_string($value),
+            'string'  => is_string($value),
+            'int', 'integer' => is_int($value),
+            'float'   => is_float($value),
             'numeric' => is_numeric($value),
-            'integer' => is_int($value),
-            'boolean' => is_bool($value),
-            'array' => is_array($value),
-            default => false,
+            'bool', 'boolean' => is_bool($value),
+            'array'   => is_array($value),
+            'object'  => is_object($value),
+            'null'    => is_null($value),
+            default   => false,
         };
     }
 

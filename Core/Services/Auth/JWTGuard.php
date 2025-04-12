@@ -28,7 +28,7 @@ class JWTGuard implements GuardInterface
     public function authorize(object $user): void
     {
         $jti = bin2hex(random_bytes(16));
-        $exp = time() + (60 * 60); // 1 час
+        $exp = time() + 15;
 
         $payload = [
             'jti' => $jti,

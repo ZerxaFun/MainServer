@@ -134,6 +134,7 @@ class Path
             'module'        => self::instance()->basePath . $sep . self::instance()->moduleDir,
             'log.user'      => self::instance()->basePath . $sep . self::instance()->logDir . $sep . self::instance()->userLogDir,
             'log.exception' => self::instance()->basePath . $sep . self::instance()->logDir . $sep . self::instance()->exceptionLogDir,
+            'logs' => self::instance()->basePath . $sep . self::instance()->logDir . $sep . self::instance()->exceptionLogDir,
             'resource'      => self::instance()->basePath . $sep . self::instance()->resourceDir,
             'public'        => self::instance()->basePath . $sep . self::instance()->publicDir,
             'theme'         => self::content() . self::instance()->themeDir,
@@ -190,10 +191,6 @@ class Path
         return self::path('theme', $module);
     }
 
-    public static function plugin(string $pluginName = ''): string
-    {
-        return self::path('plugin', $pluginName);
-    }
 
     public static function upload(string $folder = ''): string
     {

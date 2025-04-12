@@ -1,5 +1,5 @@
 <?php
 
 return [
-        'Frontend'          => 'default',
+    'API'     => 'default',
 ];

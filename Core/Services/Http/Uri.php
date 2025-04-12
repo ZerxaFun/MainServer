@@ -1,74 +1,27 @@
 <?php
-/**
- *=====================================================
- * Majestic Engine - by Zerxa Fun (Majestic Studio)   =
- *-----------------------------------------------------
- * @url: http://majestic-studio.ru/                   -
- *-----------------------------------------------------
- * @copyright: 2020 Majestic Studio and ZerxaFun      -
- *=====================================================
- *                                                    =
- *                                                    =
- *                                                    =
- *=====================================================
- */
-
 
 namespace Core\Services\Http;
 
-
-use Core\Define;
-use Core\Services\Config\Config;
+use Core\Routing\Router;
 use Core\Services\Modules\LanguageConfig;
-use Core\Services\Modules\LanguageModules;
 use Core\Services\Session\Facades\Session;
 use Route;
 
-/**
- * Класс для работы с URL
- *
- * Class Uri
- * @package Core\Services\Http
- */
 class Uri
 {
-    /**
-     * Базовый URL пользователя
-     *
-     * @var string
-     */
     protected static string $base = '';
     protected static string $assets = '';
-
-    /**
-     * Активный URL пользователя
-     *
-     * @var string
-     */
     protected static string $uri = '';
+    protected static string $host = '';
 
-    /**
-     * Получение сегментов URL в виде массива
-     * @var array
-     */
     public static array $segments = [];
     public static array $segmentsOriginal = [];
-    private static string $host = '';
 
-    /**
-     * Инициализируйте класс URI.
-     *
-     * @return void
-     */
     public static function initialize(): void
     {
+        header('X-Powered-By: Majestic Next Engine');
 
-        # Нам нужно получить различные разделы из URI для обработки
-        # правильных маршрут.
-        header('X-Powered-By: ' . Define::NAME_HEAD);
-        # Стандартный запрос в браузере?
         if (isset($_SERVER['REQUEST_URI'])) {
-            # Получить активный URI.
             $request = $_SERVER['REQUEST_URI'];
             $host = $_SERVER['HTTP_HOST'];
             $protocol = 'http' . (Request::https() ? 's' : '');
@@ -76,7 +29,6 @@ class Uri
             $assets = '//' . $host;
             $uri = $base . $request;
 
-            # Создаем сегменты URI.
             $length = strlen($base);
             $str = substr($uri, $length);
             $arr = explode('/', trim($str, '/'));
@@ -88,7 +40,6 @@ class Uri
                 }
             }
 
-            # Назначаем свойства.
             static::$base = $base;
             static::$host = $host;
             static::$assets = $assets;
@@ -96,7 +47,7 @@ class Uri
             static::$segments = $segments;
             static::$segmentsOriginal = $segments;
 
-        } else if (isset($_SERVER['argv'])) {
+        } elseif (isset($_SERVER['argv'])) {
             $segments = [];
             foreach ($_SERVER['argv'] as $arg) {
                 if ($arg !== $_SERVER['SCRIPT_NAME']) {
@@ -107,157 +58,50 @@ class Uri
             static::$segments = $segments;
             static::$segmentsOriginal = $segments;
         }
-
     }
 
-    public static function backSegment()
-    {
-        return $_SERVER['HTTP_REFERER'];
-    }
+    public static function backSegment() { return $_SERVER['HTTP_REFERER'] ?? ''; }
+    public static function segmentLast() { return array_pop(static::$segments); }
 
-    public static function segmentLast()
-    {
-        return array_pop(static::$segments);
-    }
-
-    /**
-     * Проверка, является ли данная страница главной.
-     * Возвращает bool значение.
-     *
-     * @return bool
-     */
-    final public static function main(): bool
+    public static function main(): bool
     {
         return (self::segmentStringOriginal() === '') || (self::prefixLanguage() === self::segmentOriginal(1));
     }
 
+    public static function base(): string { return static::$base; }
+    public static function host(): string { return static::$host; }
+    public static function assets(): string { return static::$assets; }
+    public static function uri(): string { return static::$uri; }
+    public static function segments(): array { return static::$segments; }
 
-    /**
-     * Получить базовый URI.
-     *
-     * @return string
-     */
-    public static function base(): string
-    {
-        return static::$base;
-    }
+    public function url(string $uri = ''): string { return static::base() . ltrim($uri, '/'); }
 
-    /**
-     * Получить базовый URI без HTTP's.
-     *
-     * @return string
-     */
-    public static function host(): string
-    {
-        return static::$host;
-    }
-
-    /**
-     * Получить базовый assets URI.
-     *
-     * @return string
-     */
-    public static function assets(): string
-    {
-        return static::$assets;
-    }
-
-    /**
-     * Получение текущего URL
-     *
-     * @return string
-     */
-    public static function uri(): string
-    {
-        return static::$uri;
-    }
-
-    /**
-     * Получите сегменты URI.
-     *
-     * @return array
-     */
-    public static function segments(): array
-    {
-        return static::$segments;
-    }
-
-    /**
-     * Возвращает URL встроенного сайта.
-     *
-     * @param string $uri - URI для добавления на базу.
-     * @return string
-     */
-    public function url(string $uri = ''): string
-    {
-        return static::base() . ltrim($uri, '/');
-    }
-
-    /**
-     * Получает сегмент из URI.
-     *
-     * @param int $num - Номер сегмента.
-     * @return string
-     */
     public static function segment(int $num): string
     {
-
         if (array_key_exists(0, static::$segments)) {
-            $allowLang = [];
+            $langList = LanguageConfig::$modules[Route::$module]['languages'] ?? [];
+            $prefixes = array_column($langList, 'prefix');
 
-            foreach (LanguageConfig::$modules[Route::$module]['languages'] as $lang) {
-                $allowLang[$lang['prefix']] = $lang;
-            }
-
-            if (array_key_exists(static::$segments[0], $allowLang)) {
+            if (in_array(static::$segments[0], $prefixes, true)) {
                 array_shift(static::$segments);
             }
         }
 
-
-
-        /**
-         * Нормализация номера сегмента
-         */
         --$num;
-
-        /**
-         * Попытка найти запрошенный сегмент
-         */
         return static::$segments[$num] ?? '';
     }
 
-    /**
-     * Получает сегмент из URI.
-     *
-     * @param int $num - Номер сегмента.
-     * @return string
-     */
     public static function segmentOriginal(int $num): ?string
     {
-        /**
-         * Нормализация номера сегмента
-         */
         --$num;
-
         return static::$segmentsOriginal[$num] ?? null;
     }
 
-    /**
-     * Получить сегменты URI в виде строки.
-     *
-     * @return string
-     */
     public static function segmentString(): string
     {
         return implode('/', static::$segments);
     }
 
-    /**
-     * Получить сегменты URI в виде строки.
-     *
-     * @return string
-     */
     public static function segmentStringOriginal(): string
     {
         return implode('/', static::$segmentsOriginal);
@@ -265,35 +109,37 @@ class Uri
 
     public static function segmentLanguage(): string
     {
-        $allowLang = [];
+        $prefix = self::segmentOriginal(1);
+        $module = Route::$module ?? Router::module()->module;
+        $languages = LanguageConfig::$modules[$module]['languages'] ?? [];
 
-        foreach (LanguageConfig::$modules[Route::$module]['languages'] as $lang) {
-            $allowLang[$lang['prefix']] = $lang['iso'];
+        foreach ($languages as $lang) {
+            if ($lang['prefix'] === $prefix) {
+                return $lang['iso'];
+            }
         }
 
-
-        return $allowLang[self::segmentOriginal(1)] ?? LanguageConfig::$modules[Route::$module]['manifest']->default;
+        return LanguageConfig::getDefaultLanguageModule($module);
     }
 
     public static function prefixLanguage(): string
     {
-        $allowLang = [];
-        foreach (LanguageConfig::$modules[Route::$module]['languages'] as $lang) {
-            $allowLang[$lang['prefix']] = $lang['prefix'];
+        $langList = LanguageConfig::$modules[Route::$module]['languages'] ?? [];
+        $map = [];
+        foreach ($langList as $lang) {
+            $map[$lang['prefix']] = $lang['prefix'];
         }
 
-
-        return $allowLang[self::segmentOriginal(1)] ?? LanguageConfig::$modules[Route::$module]['manifest']->default;
+        return $map[self::segmentOriginal(1)] ?? array_values($map)[0] ?? '';
     }
 
-    public static function getSegment()
+    public static function getSegment(): string
     {
         return str_replace(self::prefixLanguage() . '/', '', self::segmentString());
     }
 
     public static function get(string $name = '')
     {
-
         $result = [];
         foreach ($_GET as $key => $item) {
             $result[] = [
@@ -303,7 +149,7 @@ class Uri
         }
 
         if ($name !== '') {
-            return $result[$name];
+            return $result[$name] ?? null;
         }
 
         return $result;

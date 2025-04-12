@@ -119,10 +119,13 @@ class ErrorHandler
         return $trace;
     }
 
+    /**
+     * @throws ErrorException
+     */
     public static function error(int $code, string $message, string $file, int $line): bool
     {
         if ((error_reporting() & $code) !== 0) {
-            if (!Define::isDeveloper() && $code === E_USER_NOTICE) {
+            if (!$_ENV['developer'] && $code === E_USER_NOTICE) {
                 $error = compact('code', 'message', 'file', 'line');
                 $error['type'] = 'Notice';
                 self::writeLogs("{$error['type']}: {$message} in {$file} at line {$line}");
@@ -167,17 +170,15 @@ class ErrorHandler
 
             self::writeLogs("{$error['type']}: {$error['message']} in {$error['file']} at line {$error['line']}");
 
-            header('Content-Type: text/html; charset=UTF-8');
-            header('HTTP/1.1 500 Internal Server Error');
-
-            if (Define::isDeveloper()) {
+            if ($_ENV['developer'] === 'true') {
                 $error['backtrace'] = self::formatBacktrace($exception->getTrace());
                 $error['highlighted'] = self::highlightCode($error['file'], $error['line']);
                 @header('HTTP/1.1 500 Internal Server Error');
-                include sprintf("%sErrorHandler.php", Path::module('Error' . DIRECTORY_SEPARATOR . 'View'));
 
+                include sprintf("%sErrorHandler.php", Path::base('Core'  . DIRECTORY_SEPARATOR . 'Routing' . DIRECTORY_SEPARATOR . 'Theme' . DIRECTORY_SEPARATOR));
             } else {
-                include Path::module('Error/View/500.php');
+
+                include sprintf("%s500.php", Path::base('Core' . DIRECTORY_SEPARATOR . 'Routing' . DIRECTORY_SEPARATOR . 'Theme' . DIRECTORY_SEPARATOR));
             }
 
         } catch (Exception $e) {

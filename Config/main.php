@@ -1,5 +1,6 @@
 <?php
 
 return [
-    'errorModule' => 'Frontend'
+    'logStore'      => 'local',
+    'useBrowserLang' => false
 ];
