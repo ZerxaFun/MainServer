@@ -17,7 +17,7 @@ use View;
 
 class AccountController extends Controller
 {
-    #[HttpMethod(['post'], '/register')]
+    #[NoReturn] #[HttpMethod(['post'], '/register')]
     #[Validate([
         'name'     => ['required' => true],
         'login'    => ['required' => true],
@@ -57,9 +57,9 @@ class AccountController extends Controller
     #[HttpMethod(['get'], '/me')]
     public function me(): void
     {
-        self::api(
-            []
-        );
+        self::apiAdd('user', 'god');
+        self::apiAdd('token', 'xyz');
+        self::apiFlush();
     }
     #[HttpGet('/')]
     public function home(): View
@@ -70,7 +70,6 @@ class AccountController extends Controller
     #[HttpMethod(['get'], '/home')]
     public function homeD(): View
     {
-        dd(Repository::stored());
         return View::make('home');
     }
 }

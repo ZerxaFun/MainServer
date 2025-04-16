@@ -22,11 +22,10 @@ set_time_limit(-1);
 
 
 use Core\Bootstrap\Bootstrap;
+use Core\Routing\APIControllers;
 
 
 require '../vendor/autoload.php';
-
-
 
 
 try {
@@ -35,7 +34,7 @@ try {
         header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
         header("Access-Control-Allow-Headers: Content-Type, Authorization");
         header("Access-Control-Max-Age: 86400");
-        exit(0);
+        exit();
     }
 
     header("Access-Control-Allow-Origin: *");
@@ -46,5 +45,5 @@ try {
 
     Bootstrap::run(dirname(__DIR__));
 } catch (Exception $exception) {
-    dd($exception);
+
 }

@@ -3,21 +3,22 @@
 namespace Modules\API\Controller;
 
 use Controller;
-use Core\Services\Routing\Attributes\HttpGet;
-use Illuminate\Database\QueryException;
-use Illuminate\Database\Capsule\Manager as DB;
-use PDOException;
+use Core\Routing\Attributes\HttpMethod;
+
 
 class APIController extends Controller
 {
-    #[HttpGet('api/v1/connect')]
-    public function connect(): void
+
+    #[HttpMethod(['get'], '/connect')]
+    public function checkDatabase(): void
     {
         try {
-            DB::connection()->getPdo();
-            self::api(status: 'success');
-        } catch (QueryException | PDOException $e) {
-            self::api(statusCode: 500, status: 'error');
+            $connection = \Illuminate\Database\Capsule\Manager::connection();
+            $connection->getPdo(); // Попытка подключиться к PDO
+
+            self::api(['db' => 'ok']);
+        } catch (\Throwable $e) {
+            self::api(['db' => 'fail', 'error' => $e->getMessage()], 500, 'fail');
         }
     }
 }
