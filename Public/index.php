@@ -1,5 +1,6 @@
 <?php
 
+
 declare(strict_types=1);
 set_time_limit(-1);
 
@@ -18,7 +19,6 @@ set_time_limit(-1);
  * Подключение composer и констант фреймворка         =
  *=====================================================
  */
-
 
 
 use Core\Bootstrap\Bootstrap;
@@ -42,8 +42,7 @@ try {
     header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 
-
     Bootstrap::run(dirname(__DIR__));
 } catch (Exception $exception) {
-
+    APIControllers::setData(data: $exception, code: 500);
 }

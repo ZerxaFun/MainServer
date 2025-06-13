@@ -2,5 +2,8 @@
 
 return [
     'logStore'      => 'local',
-    'useBrowserLang' => false
+    'errorModule'      => 'API',
+    'JSApp'      => true,
+    'useBrowserLang' => false,
+    'userTable' => 'UserAccount'
 ];
