@@ -246,51 +246,33 @@ class OrderController extends Controller
     }
 
 
-    /**
-     * Получение активного заказа по UUID, с учетом последней версии.
-     * Мы берем максимальную версию заказа и изделий, соответствующих этой версии.
-     *
-     * @return void
-     * @throws JsonException
-     */
-    public function getOrderEdit(): void
+    #[NoReturn]
+    #[HttpMethod(['post'], '/api/v1/orders/get-task-edit')]
+    #[Authorize(guard: 'jwt', permission: ['admin'])] // поправь роли при необходимости
+    #[Validate([
+        'uuid'     => ['required' => true, 'type' => 'uuid'],
+        'language' => ['required' => true, 'equals' => 2],
+    ])]
+    public static function getOrderEdit(ValidatedRequest $request): void
     {
         try {
-            // Проверяем авторизацию
-            if (!array_key_exists('HTTP_AUTHORIZATION', $_SERVER)) {
-                throw new \Exception('Authorization failed');
-            }
+            $request->check();
 
-            $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-            $jwt = explode(" ", $authHeader)[1] ?? null;
-            if (!$jwt) {
-                throw new \Exception('Token not provided.');
-            }
-            JWT::decode($jwt, new Key($_ENV['s_key'], 'HS256'));
+            $uuid     = $request->input('uuid');
+            $language = $request->input('language');
 
-            // 1) Получаем UUID из запроса
-            $uuid = Input::json('uuid');
-            if (empty($uuid)) {
-                throw new \Exception('UUID not provided.');
-            }
-
-            // 2) Считываем язык (по умолчанию 'ru')
-            $language = Input::json('language') ?? 'ru';
-
-            // 3) Находим заказ с максимальной версией
             $order = OrderModel::where('OrderUUID', $uuid)
                 ->join('UserAccount', 'Orders.CreatedBy', '=', 'UserAccount.UserID')
                 ->join('Partner', 'Orders.PartnerID', '=', 'Partner.PartnerID')
-                ->orderBy('Orders.Version', 'desc')
-                ->select(
+                ->orderByDesc('Orders.Version')
+                ->select([
                     'Orders.*',
                     'UserAccount.Username as UserName',
                     'Partner.LegalName as PartnerName',
                     'Partner.ShortName as PartnerShortName',
-                )
+                ])
                 ->first();
 
-            // Получаем дату создания первоначального документа (версии 1)
             $orderFirstDate = OrderModel::where('OrderUUID', $uuid)
                 ->where('Version', 1)
                 ->select('CreatedAt')
@@ -300,32 +282,28 @@ class OrderController extends Controller
                 throw new \Exception('Order not found.');
             }
 
-            $itemsWithDetails = [];
-
-            // 4) Получаем OrderItems для этой (максимальной) версии
             $orderItems = OrderItemModel::where('OrderUUID', $uuid)
                 ->where('Version', $order->Version)
-                ->orderBy('CreatedAt', 'desc')
+                ->orderByDesc('CreatedAt')
                 ->get();
 
-            // 5) Перебираем все OrderItems, извлекаем материалы/услуги
+            $itemsWithDetails = [];
+
             foreach ($orderItems as $item) {
                 $materialsAndServices = json_decode($item->MaterialsAndServices, true) ?: [];
                 $materials = $materialsAndServices['materials'] ?? [];
-                $services  = $materialsAndServices['services']  ?? [];
+                $services  = $materialsAndServices['services'] ?? [];
 
-                // Детализируем материалы
                 $detailedMaterials = [];
+
                 foreach ($materials as $material) {
                     $materialID = $material['selectedMaterial'];
 
-                    // Вместо ProductName – запрос к ProductTranslations
                     $materialName = DB::table('ProductTranslations')
                         ->where('ProductID', $materialID)
                         ->where('LanguageCode', $language)
                         ->value('Name') ?? 'Unknown';
 
-                    // Доступное количество (все приходные и расходные транзакции)
                     $totalAvailable = DB::table('StockTransactions')
                         ->join('Warehouse', 'StockTransactions.WarehouseID', '=', 'Warehouse.WarehouseID')
                         ->where('StockTransactions.ProductID', $materialID)
@@ -337,20 +315,20 @@ class OrderController extends Controller
                         END
                     "));
 
-                    // Распределение, откуда будет взято (sort by Price asc)
-                    $takenFromStock = [];
                     $remainingQuantity = $material['quantity'];
+                    $takenFromStock = [];
 
                     $sortedStock = DB::table('StockTransactions')
                         ->join('Warehouse', 'StockTransactions.WarehouseID', '=', 'Warehouse.WarehouseID')
                         ->where('StockTransactions.ProductID', $materialID)
-                        ->where('StockTransactions.StockTransactionType', 1) // только приходы
+                        ->where('StockTransactions.StockTransactionType', 1)
                         ->select(['StockTransactions.Quantity', 'StockTransactions.Price'])
                         ->orderBy('StockTransactions.Price', 'asc')
                         ->get();
 
                     foreach ($sortedStock as $stock) {
                         if ($remainingQuantity <= 0) break;
+
                         $availableQuantity = $stock->Quantity;
                         $takenQuantity = min($remainingQuantity, $availableQuantity);
 
@@ -358,10 +336,10 @@ class OrderController extends Controller
                             'price'         => $stock->Price,
                             'takenQuantity' => $takenQuantity,
                         ];
+
                         $remainingQuantity -= $takenQuantity;
                     }
 
-                    // Задолженность
                     $debt = max(0, $material['quantity'] - $totalAvailable);
 
                     $detailedMaterials[] = [
@@ -376,12 +354,10 @@ class OrderController extends Controller
                     ];
                 }
 
-                // Детализируем услуги
                 $detailedServices = [];
                 foreach ($services as $service) {
                     $serviceID = $service['selectedService'] ?? '';
 
-                    // Запрашиваем перевод
                     $serviceName = DB::table('ProductTranslations')
                         ->where('ProductID', $serviceID)
                         ->where('LanguageCode', $language)
@@ -401,23 +377,13 @@ class OrderController extends Controller
                 ];
             }
 
-            // 6) Возвращаем итоги
-            self::setData(
-                result: [
-                    'order'       => $order,
-                    'items'       => $itemsWithDetails,
-                    'created_at'  => $orderFirstDate->CreatedAt ?? null,
-                    'materialSummary' => [] // Если нужно
-                ],
-                status: 'success'
-            );
-
-        } catch (\Exception $e) {
-            self::setData(
-                result: ['error' => $e->getMessage()],
-                statusCode: 500,
-                status: 'error'
-            );
+            self::api([
+                'order'           => $order,
+                'items'           => $itemsWithDetails,
+                'created_at'      => $orderFirstDate->CreatedAt ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            self::api(['error' => $e->getMessage()], 500, 'error');
         }
     }
 
@@ -434,7 +400,7 @@ class OrderController extends Controller
     #[Validate([
         'ItemPermID' => ['required' => true, 'type' => 'uuid'],
         'itemUUID'   => ['required' => false, 'type' => 'uuid'],
-        'language'   => ['required' => false, 'type' => 'string'],
+        'language' => ['required' => true, 'equals' => 2],
     ])]
     public static function getItemMaterials(ValidatedRequest $request): void
     {
@@ -442,7 +408,7 @@ class OrderController extends Controller
             $request->check();
             $ItemPermID = $request->input('ItemPermID');
             $ItemUUID = $request->input('itemUUID');
-            $language = $request->input('language') ?? 'ru';
+            $language = $request->input('language');
 
             $item = OrderItemModel::where('ItemPermID', $ItemPermID)
                 ->orderByDesc('CreatedAt')
